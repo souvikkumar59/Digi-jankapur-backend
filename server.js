@@ -54,9 +54,14 @@ app.get('/', (req, res) => {
   res.send('Server core operational and Real-time Socket nodes armed!');
 });
 
-const PORT = process.env.PORT || 5000;
+// 💡 4. VERCEL SERVERLESS COMPATIBILITY
+// Run standard server initialization ONLY when testing locally, not on Vercel production.
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => {
+    console.log(`Server executing smoothly on port ${PORT}`);
+  });
+}
 
-// 💡 4. CRITICAL: Switch app.listen to server.listen so the HTTP + Socket framework boots up synchronized!
-server.listen(PORT, () => {
-  console.log(`Server executing smoothly on port ${PORT}`);
-});
+// 💡 CRITICAL FOR VERCEL: Export the raw express application instance
+module.exports = app;
