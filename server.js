@@ -50,6 +50,8 @@ io.on('connection', (socket) => {
   });
 });
 
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 app.get('/', (req, res) => {
   res.send('Server core operational and Real-time Socket nodes armed!');
 });
