@@ -13,7 +13,7 @@ const server = http.createServer(app);
 // 💡 2. Initialize the global WebSocket gateway engine with relaxed cross-port CORS laws
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174"], // Admits both local frontend development servers
+    origin: ["http://localhost:5173", "http://localhost:5174","https://smart-jankapur-frontend.vercel.app"], // Admits both local frontend development servers
     methods: ["GET", "POST"]
   }
 });
