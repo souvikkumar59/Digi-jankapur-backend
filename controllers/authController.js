@@ -1,33 +1,117 @@
 const User = require('../models/User');
+const Otp = require('../models/Otp');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+
+// @desc    Send a 6-digit registration OTP to user's phone number
+// @route   POST /api/auth/send-otp
+// @access  Public
+const sendRegistrationOtp = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+
+    if (!phoneNumber || phoneNumber.toString().trim().length !== 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit mobile number'
+      });
+    }
+
+    const cleanPhone = phoneNumber.toString().trim();
+
+    // 1. Check if user is already registered in the system
+    const userExists = await User.findOne({ phoneNumber: cleanPhone });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: 'This mobile number is already registered. Please sign in instead.'
+      });
+    }
+
+    // 2. Generate a secure 6-digit numeric OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. Clear any previous unverified OTPs for this phone number
+    await Otp.deleteMany({ phoneNumber: cleanPhone });
+
+    // 4. Save the new OTP in database with 5-minute auto-expiry
+    await Otp.create({
+      phoneNumber: cleanPhone,
+      otp
+    });
+
+    console.log(`[AUTH] Registration OTP generated for +91 ${cleanPhone}: ${otp}`);
+
+    res.status(200).json({
+      success: true,
+      message: `A 6-digit verification code has been sent to +91 ${cleanPhone}`,
+      demoOtp: otp // Included for zero-cost demo / direct test access
+    });
+
+  } catch (error) {
+    console.error('Send OTP Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate verification OTP: ' + error.message
+    });
+  }
+};
 
 // @desc    Register a new student, teacher, or admin
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, phoneNumber, password, gender, schoolName, classOrBatch } = req.body;
+    const { name, phoneNumber, password, gender, schoolName, classOrBatch, otp } = req.body;
 
-    // 1. Check if the user already exists in the village cluster
-    const userExists = await User.findOne({ phoneNumber });
+    if (!phoneNumber || phoneNumber.toString().trim().length !== 10) {
+      return res.status(400).json({ success: false, message: 'Please provide a valid 10-digit phone number' });
+    }
+
+    const cleanPhone = phoneNumber.toString().trim();
+
+    // 1. Verify OTP
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide the 6-digit verification OTP sent to your phone'
+      });
+    }
+
+    const validOtpRecord = await Otp.findOne({
+      phoneNumber: cleanPhone,
+      otp: otp.toString().trim()
+    });
+
+    if (!validOtpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired OTP. Please check the code or request a new one.'
+      });
+    }
+
+    // 2. Check if the user already exists in the village cluster
+    const userExists = await User.findOne({ phoneNumber: cleanPhone });
     if (userExists) {
       return res.status(400).json({ success: false, message: 'This phone number is already registered' });
     }
 
-    // 2. Encrypt the password using bcryptjs hashes
+    // 3. Encrypt the password using bcryptjs hashes
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 3. Create the user database document record inside MongoDB Cloud
+    // 4. Create the user database document record inside MongoDB Cloud
     const user = await User.create({
       name,
-      phoneNumber,
+      phoneNumber: cleanPhone,
       password: hashedPassword,
       gender,
       schoolName,
       classOrBatch
     });
+
+    // 5. Clean up verified OTP record
+    await Otp.deleteMany({ phoneNumber: cleanPhone });
 
     res.status(201).json({
       success: true,
@@ -201,7 +285,7 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, adminCreateTeacher, resetPassword };
+module.exports = { registerUser, sendRegistrationOtp, loginUser, adminCreateTeacher, resetPassword };
 
 
 
