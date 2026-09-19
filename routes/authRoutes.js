@@ -27,6 +27,11 @@ router.post('/login-otp', loginWithOtp);
 router.post('/send-reset-otp', sendResetPasswordOtp);
 router.post('/reset-password', resetPassword);
 
+// Profile sync endpoint
+router.get('/me', protect, (req, res) => {
+  res.status(200).json({ success: true, user: req.user });
+});
+
 
 // Secure Admin Endpoint: Requires a valid token AND admin privileges checked in the controller
 router.post('/admin/create-teacher', protect, adminCreateTeacher);

@@ -118,6 +118,10 @@ const registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Auto-assign admin role to the portal founder/admin
+    const isMasterAdmin = cleanEmail === 'souvikkumarbaguli51@gmail.com' || (phoneNumber && phoneNumber.toString().trim() === '8116860140');
+    const role = isMasterAdmin ? 'admin' : 'student';
+
     // 4. Create the user document
     const user = await User.create({
       name,
@@ -126,7 +130,8 @@ const registerUser = async (req, res) => {
       password: hashedPassword,
       gender: gender || 'Male',
       schoolName: schoolName || 'Jankapur High School',
-      classOrBatch: classOrBatch || ''
+      classOrBatch: classOrBatch || '',
+      role
     });
 
     // 5. Clean up verified OTP record
@@ -162,9 +167,24 @@ const loginUser = async (req, res) => {
     const cleanEmail = email.toString().trim().toLowerCase();
 
     // 1. Fetch user records and explicitly request the hidden password field
-    const user = await User.findOne({ email: cleanEmail }).select('+password');
+    let user = await User.findOne({ email: cleanEmail }).select('+password');
+    if (!user && cleanEmail === 'souvikkumarbaguli51@gmail.com') {
+      user = await User.findOne({ phoneNumber: '8116860140' }).select('+password');
+      if (user) {
+        user.email = cleanEmail;
+      }
+    }
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    // Auto-guarantee admin role for platform founder
+    if (cleanEmail === 'souvikkumarbaguli51@gmail.com' || user.phoneNumber === '8116860140') {
+      if (user.role !== 'admin') {
+        user.role = 'admin';
+        await user.save();
+      }
     }
 
     // 2. Validate password match
@@ -214,12 +234,28 @@ const sendLoginOtp = async (req, res) => {
     const cleanEmail = email.toString().trim().toLowerCase();
 
     // 1. Check if user is registered in the system
-    const user = await User.findOne({ email: cleanEmail });
+    let user = await User.findOne({ email: cleanEmail });
+    if (!user && cleanEmail === 'souvikkumarbaguli51@gmail.com') {
+      user = await User.findOne({ phoneNumber: '8116860140' });
+      if (user) {
+        user.email = cleanEmail;
+        user.role = 'admin';
+        await user.save();
+      }
+    }
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'No registered account found with this email. Please sign up first.'
       });
+    }
+
+    if (cleanEmail === 'souvikkumarbaguli51@gmail.com' || user.phoneNumber === '8116860140') {
+      if (user.role !== 'admin') {
+        user.role = 'admin';
+        await user.save();
+      }
     }
 
     // 2. Generate a secure 6-digit numeric OTP
@@ -296,12 +332,27 @@ const loginWithOtp = async (req, res) => {
     }
 
     // 2. Fetch user details
-    const user = await User.findOne({ email: cleanEmail });
+    let user = await User.findOne({ email: cleanEmail });
+    if (!user && cleanEmail === 'souvikkumarbaguli51@gmail.com') {
+      user = await User.findOne({ phoneNumber: '8116860140' });
+      if (user) {
+        user.email = cleanEmail;
+      }
+    }
+
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'User account not found'
       });
+    }
+
+    // Auto-guarantee admin role for platform founder
+    if (cleanEmail === 'souvikkumarbaguli51@gmail.com' || user.phoneNumber === '8116860140') {
+      if (user.role !== 'admin') {
+        user.role = 'admin';
+        await user.save();
+      }
     }
 
     // 3. Clear used login OTPs
