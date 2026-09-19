@@ -13,12 +13,8 @@ const QuizSchema = new mongoose.Schema({
   },
   schoolTag: {
     type: String,
-    enum: [
-      'Jankapur High School', 
-      'Jankapur Primary School', 
-      'Bodhi Bikash', 
-      'Jankapur High Madrasha'
-    ],
+    default: 'All Schools',
+    trim: true,
     required: true
   },
   classLevel: {

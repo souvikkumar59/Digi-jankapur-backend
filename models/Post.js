@@ -12,6 +12,12 @@ const PostSchema = new mongoose.Schema({
     trim: true,
     maxlength: [1000, 'Post content cannot exceed 1000 characters']
   },
+  topic: {
+    type: String,
+    trim: true,
+    default: 'General Notice'
+  },
+
   imageUrl: {
     type: String,
     default: ''

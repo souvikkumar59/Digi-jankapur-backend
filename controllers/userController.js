@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
+const Post = require('../models/Post');
 
 // @desc    Get all students for the directory grid with filters
 // @route   GET /api/users/directory
@@ -138,11 +140,48 @@ const getProfileAnalytics = async (req, res) => {
   }
 };
 
+// @desc    Get public profile of a specific classmate including their recent posts
+// @route   GET /api/users/:id
+// @access  Private
+const getUserProfile = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ success: false, message: 'Invalid classmate ID format' });
+    }
+
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Classmate profile not found' });
+    }
+
+    // Fetch user's recent posts / doubts
+    const userPosts = await Post.find({ user: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('user', 'name profilePicture schoolName classOrBatch')
+      .populate('comments.user', 'name profilePicture');
+
+    const postsCount = await Post.countDocuments({ user: req.params.id });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...user.toObject(),
+        postsCount,
+        recentPosts: userPosts
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Profile Fetch Error: ' + error.message });
+  }
+};
+
 // 💡 Update your export object mapping list at the very bottom line:
 module.exports = { 
   getDirectory, 
   updateProfile, 
   incrementProfileView, 
-  getProfileAnalytics // Added export hook!
+  getProfileAnalytics,
+  getUserProfile
 };
 

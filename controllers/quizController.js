@@ -32,19 +32,42 @@ const createQuiz = async (req, res) => {
   }
 };
 
-// @desc    Fetch available quizzes matching a student's school and class filters
+// @desc    Fetch available quizzes for all students
 // @route   GET /api/quizzes
 // @access  Private
 const getAvailableQuizzes = async (req, res) => {
   try {
-    const { schoolTag, classLevel } = req.query;
+    const { schoolTag, classLevel, search } = req.query;
     
     let query = {};
-    if (schoolTag) query.schoolTag = schoolTag;
-    if (classLevel) query.classLevel = classLevel;
 
-    // Fetch tests, returning everything EXCEPT the explicit correct answers to prevent source code leaks
-    const quizzes = await Quiz.find(query).select('-questions.correctOption').populate('createdBy', 'name');
+    if (schoolTag && schoolTag !== 'All' && schoolTag !== 'All Schools') {
+      // Match either Jankapur or Janakpur interchangeably for backwards compatibility
+      const normalizedPattern = schoolTag.replace(/jan(?:a)?kapur/i, 'Jan(a)?kapur');
+      const schoolRegex = new RegExp(normalizedPattern, 'i');
+      query.$or = [
+        { schoolTag: { $regex: schoolRegex } },
+        { schoolTag: { $in: ['All Schools', 'Open to All', 'General', 'Open'] } },
+        { schoolTag: { $exists: false } }
+      ];
+    }
+
+    if (classLevel && classLevel !== 'All') {
+      query.classLevel = { $regex: new RegExp(classLevel, 'i') };
+    }
+
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Fetch tests, returning everything EXCEPT correctOption to maintain exam integrity
+    const quizzes = await Quiz.find(query)
+      .select('-questions.correctOption')
+      .populate('createdBy', 'name')
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
@@ -103,4 +126,38 @@ const submitQuiz = async (req, res) => {
   }
 };
 
-module.exports = { createQuiz, getAvailableQuizzes, submitQuiz };
+// @desc    Delete an exam / mock test
+// @route   DELETE /api/quizzes/:id
+// @access  Private (Admin or Quiz Creator only)
+const deleteQuiz = async (req, res) => {
+  try {
+    const quiz = await Quiz.findById(req.params.id);
+
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Mock exam not found' });
+    }
+
+    // Security Gate: Only platform admin or the creator can delete
+    const isCreator = quiz.createdBy && quiz.createdBy.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin && !isCreator) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not authorized to delete this mock exam.'
+      });
+    }
+
+    await Quiz.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Mock exam deleted successfully!'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Quiz Deletion Error: ' + error.message });
+  }
+};
+
+module.exports = { createQuiz, getAvailableQuizzes, submitQuiz, deleteQuiz };
+

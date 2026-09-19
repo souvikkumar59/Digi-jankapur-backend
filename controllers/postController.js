@@ -5,23 +5,32 @@ const Post = require('../models/Post');
 // @access  Private (Logged-in users only)
 const createPost = async (req, res) => {
   try {
-    const { content, imageUrl } = req.body;
+    const { content, imageUrl, topic } = req.body;
 
-    if (!content) {
-      return res.status(400).json({ success: false, message: 'Post content cannot be empty' });
+    if (!content && !imageUrl) {
+      return res.status(400).json({ success: false, message: 'Post content or image is required' });
     }
 
     // Create the post document, linking it to the student's ID captured by the middleware
     const post = await Post.create({
-      content,
-      imageUrl,
+      content: content || '',
+      imageUrl: imageUrl || '',
+      topic: topic || 'General Notice',
       user: req.user.id
     });
+
+    const populatedPost = await Post.findById(post._id)
+      .populate('user', 'name profilePicture schoolName classOrBatch');
+
+    // 💡 LIVE BROADCAST: Emit new post immediately so it appears on all connected peer screens
+    if (req.io) {
+      req.io.emit('new_post', populatedPost);
+    }
 
     res.status(201).json({
       success: true,
       message: 'Post updated to the village timeline successfully!',
-      data: post
+      data: populatedPost
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Timeline Error: ' + error.message });
@@ -33,11 +42,18 @@ const createPost = async (req, res) => {
 // @access  Private
 const getAllPosts = async (req, res) => {
   try {
+    const { topic } = req.query;
+    let query = {};
+
+    if (topic && topic !== 'All') {
+      query.topic = topic;
+    }
+
     // Look up posts, sorting by newest (-1) and swap user IDs for real Names and Pics
-    const posts = await Post.find()
+    const posts = await Post.find(query)
       .sort({ createdAt: -1 })
       .populate('user', 'name profilePicture schoolName classOrBatch')
-      .populate('comments.user', 'name profilePicture');
+      .populate('comments.user', 'name profilePicture role');
 
     res.status(200).json({
       success: true,
@@ -49,6 +65,51 @@ const getAllPosts = async (req, res) => {
   }
 };
 
+// @desc    Toggle Like / Upvote on a doubt post
+// @route   POST /api/posts/:id/like
+// @access  Private
+const likePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ success: false, message: 'Doubt post not found' });
+    }
+
+    const userIdStr = req.user.id.toString();
+    const existingIndex = post.likes.findIndex((id) => id.toString() === userIdStr);
+
+    let isLiked = false;
+    if (existingIndex > -1) {
+      post.likes.splice(existingIndex, 1);
+      isLiked = false;
+    } else {
+      post.likes.push(req.user.id);
+      isLiked = true;
+    }
+
+    await post.save();
+
+    const updatedPost = await Post.findById(req.params.id)
+      .populate('user', 'name profilePicture schoolName classOrBatch')
+      .populate('comments.user', 'name profilePicture role');
+
+    // 💡 LIVE BROADCAST: Notify all peers with updated like counter
+    if (req.io) {
+      req.io.emit('doubt_updated', updatedPost);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: isLiked ? 'Upvote registered! ❤️' : 'Upvote removed',
+      isLiked,
+      likesCount: updatedPost.likes.length,
+      data: updatedPost
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Like Engine Error: ' + error.message });
+  }
+};
 
 // @desc    Comment / Answer a specific doubt post with real-time broadcasting
 // @route   POST /api/posts/:id/comment
@@ -76,12 +137,14 @@ const commentOnPost = async (req, res) => {
       .populate('comments.user', 'name profilePicture role');
 
     // 💡 LIVE BROADCAST: Emit the updated post to every smartphone listening in the village!
-    req.io.emit('doubt_updated', updatedPost);
+    if (req.io) {
+      req.io.emit('doubt_updated', updatedPost);
+    }
 
-    res.status(200).json({ success: true, message: 'Answer compiled and broadcasted live!' });
+    res.status(200).json({ success: true, message: 'Answer compiled and broadcasted live!', data: updatedPost });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Comment Engine Error: ' + error.message });
   }
 };
 
-module.exports = { createPost, getAllPosts , commentOnPost };
+module.exports = { createPost, getAllPosts, likePost, commentOnPost };

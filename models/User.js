@@ -7,7 +7,7 @@ const UserSchema = new mongoose.Schema({
   gender: { type: String, enum: ['Male', 'Female', 'Other'], default: 'Male' },
   schoolName: { type: String, required: true },
   classOrBatch: { type: String, default: '' },
-  bio: { type: String, default: 'Hello! I am a student using Janakpur Hub.' },
+  bio: { type: String, default: 'Hello! I am a student using Jankapur Hub.' },
   role: { type: String, enum: ['student', 'teacher', 'admin'], default: 'student' },
   profilePicture: { type: String, default: '' },
   profileViews: { type: Number, default: 0 },

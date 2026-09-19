@@ -13,16 +13,18 @@ const server = http.createServer(app);
 // 💡 2. Initialize the global WebSocket gateway engine with relaxed cross-port CORS laws
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:5173", "http://localhost:5174","https://smart-jankapur-frontend.vercel.app"], // Admits both local frontend development servers
+    origin: "*",
     methods: ["GET", "POST"]
   }
 });
+
 
 // Initialize Cloud Database Connection
 connectDB();
 
 // Global Middlewares
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cors());
 
 // Make our raw live 'io' object accessible to all our endpoint controllers by binding it to the request block
@@ -39,6 +41,9 @@ app.use('/api/documents', require('./routes/documentRoutes'));
 app.use('/api/posts', require('./routes/postRoutes'));
 app.use('/api/payments', require('./routes/paymentRoutes'));
 app.use('/api/quizzes', require('./routes/quizRoutes'));
+app.use('/api/notices', require('./routes/noticeRoutes'));
+app.use('/api/campus', require('./routes/campusRoutes'));
+
 
 
 // 💡 3. Setup the live radio event listeners

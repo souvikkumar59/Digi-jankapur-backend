@@ -13,9 +13,12 @@ const DocumentSchema = new mongoose.Schema({
   schoolTag: {
     type: String,
     enum: [
+      'Jankapur High School', 
+      'Jankapur Primary School', 
+      'Bodhi Bikash', 
+      'Jankapur High Madrasha',
       'Janakpur High School', 
       'Janakpur Primary School', 
-      'Bodhi Bikash', 
       'Janakpur High Madrasha',
       'General'
     ],
@@ -30,6 +33,27 @@ const DocumentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please add the subject name'],
     trim: true
+  },
+  category: {
+    type: String,
+    enum: ['PYQ', 'Notes', 'Assignment', 'Model Paper'],
+    default: 'Notes'
+  },
+  year: {
+    type: Number,
+    default: null
+  },
+  examType: {
+    type: String,
+    enum: [
+      'Madhyamik / Board',
+      'Pre-Board / Selection Test',
+      'Midterm Examination',
+      'Annual Exam',
+      'Model Question Paper',
+      'General'
+    ],
+    default: 'General'
   },
   fileUrl: {
     type: String,

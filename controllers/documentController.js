@@ -6,7 +6,7 @@ const Order = require('../models/Order');
 // @access  Private (Admin/Teacher only)
 const uploadDocument = async (req, res) => {
   try {
-    const { title, description, schoolTag, classLevel, subject, fileUrl, isPremium, price } = req.body;
+    const { title, description, schoolTag, classLevel, subject, fileUrl, isPremium, price, category, year, examType } = req.body;
 
     // Check if the user trying to upload is a student (block them)
     if (req.user.role === 'student') {
@@ -22,7 +22,10 @@ const uploadDocument = async (req, res) => {
       subject,
       fileUrl,
       isPremium,
-      price,
+      price: price || 0,
+      category: category || 'Notes',
+      year: year ? parseInt(year, 10) : undefined,
+      examType: examType || 'General',
       uploadedBy: req.user.id // Captured automatically by our authMiddleware
     });
 
@@ -37,20 +40,32 @@ const uploadDocument = async (req, res) => {
   }
 };
 
-// @desc    Get filtered documents by school selection, class, or subject
+// @desc    Get filtered documents by school selection, class, subject, category, year, or search
 // @route   GET /api/documents
 // @access  Private
 const getDocuments = async (req, res) => {
   try {
-    const { schoolTag, classLevel, subject } = req.query;
+    const { schoolTag, classLevel, subject, category, year, examType, search } = req.query;
     
     let query = {};
     if (schoolTag) query.schoolTag = schoolTag;
     if (classLevel) query.classLevel = classLevel;
     if (subject) query.subject = subject;
+    if (category) query.category = category;
+    if (year) query.year = parseInt(year, 10);
+    if (examType) query.examType = examType;
+    if (search) {
+      query.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { subject: { $regex: search, $options: 'i' } }
+      ];
+    }
 
-    // 1. FIXED: Corrected lowercase 'documents' typo to the valid 'Document' Mongoose model mapping
-    const documents = await Document.find(query).populate('uploadedBy', 'name role');
+    // Sort newest/highest year first
+    const documents = await Document.find(query)
+      .sort({ year: -1, createdAt: -1 })
+      .populate('uploadedBy', 'name role');
 
     // 2. Fetch all completed orders purchased by the currently logged-in student account
     const completedOrders = await Order.find({
@@ -84,8 +99,42 @@ const getDocuments = async (req, res) => {
   }
 };
 
-// 💡 FIXED: Removed the invalid 'purchasedDocIds' reference out of exports
+// @desc    Delete a document/PYQ from vault
+// @route   DELETE /api/documents/:id
+// @access  Private (Admin or Document Uploader only)
+const deleteDocument = async (req, res) => {
+  try {
+    const document = await Document.findById(req.params.id);
+
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Document not found in vault' });
+    }
+
+    // Authorization: only platform admin or the uploader can delete
+    const isUploader = document.uploadedBy && document.uploadedBy.toString() === req.user.id;
+    const isAdmin = req.user.role === 'admin';
+
+    if (!isAdmin && !isUploader) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You are not authorized to delete this document.'
+      });
+    }
+
+    await Document.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Document permanently deleted from the vault!'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Document Deletion Error: ' + error.message });
+  }
+};
+
 module.exports = { 
   uploadDocument, 
-  getDocuments
+  getDocuments,
+  deleteDocument
 };
+

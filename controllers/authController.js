@@ -127,8 +127,81 @@ const adminCreateTeacher = async (req, res) => {
   }
 };
 
-// Make sure to export the new control method at the bottom object!
-module.exports = { registerUser, loginUser, adminCreateTeacher };
+// @desc    Self-service password reset with identity verification
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { phoneNumber, schoolName, classOrBatch, newPassword } = req.body;
+
+    if (!phoneNumber || !schoolName || !classOrBatch || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide phone number, school, class/batch, and a new password.'
+      });
+    }
+
+    if (phoneNumber.length !== 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid 10-digit phone number.'
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be at least 6 characters long.'
+      });
+    }
+
+    // 1. Locate student record
+    const user = await User.findOne({ phoneNumber });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'No student account found with this phone number.'
+      });
+    }
+
+    // 2. Verify identity against school and class records
+    const cleanSchoolInput = schoolName.trim().toLowerCase();
+    const cleanUserSchool = (user.schoolName || '').trim().toLowerCase();
+
+    const cleanClassInput = classOrBatch.trim().toLowerCase();
+    const cleanUserClass = (user.classOrBatch || '').trim().toLowerCase();
+
+    const schoolMatches = cleanUserSchool === cleanSchoolInput || cleanUserSchool.includes(cleanSchoolInput) || cleanSchoolInput.includes(cleanUserSchool);
+    const classMatches = cleanUserClass === cleanClassInput || cleanUserClass.includes(cleanClassInput) || cleanClassInput.includes(cleanUserClass);
+
+    if (!schoolMatches || !classMatches) {
+      return res.status(403).json({
+        success: false,
+        message: 'Verification failed. The school or class does not match the registered profile.'
+      });
+    }
+
+    // 3. Encrypt new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    user.password = hashedPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password reset successfully! You can now sign in with your new password.'
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Password Reset Server Error: ' + error.message
+    });
+  }
+};
+
+module.exports = { registerUser, loginUser, adminCreateTeacher, resetPassword };
 
 
 
