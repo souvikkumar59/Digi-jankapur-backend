@@ -1,14 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, sendRegistrationOtp, loginUser, adminCreateTeacher, resetPassword } = require('../controllers/authController');
+const {
+  registerUser,
+  sendRegistrationOtp,
+  loginUser,
+  sendLoginOtp,
+  loginWithOtp,
+  adminCreateTeacher,
+  sendResetPasswordOtp,
+  resetPassword
+} = require('../controllers/authController');
 
 // 💡 ADD THIS LINE AT THE TOP TO FIX THE CRASH:
 const { protect } = require('../middleware/authMiddleware');  
 
-// Define API paths and map them to our controller methods
+// Registration Endpoints
 router.post('/send-otp', sendRegistrationOtp);
 router.post('/register', registerUser);
+
+// Login Endpoints (Password + OTP)
 router.post('/login', loginUser);
+router.post('/send-login-otp', sendLoginOtp);
+router.post('/login-otp', loginWithOtp);
+
+// Account Recovery Endpoints (OTP-protected)
+router.post('/send-reset-otp', sendResetPasswordOtp);
 router.post('/reset-password', resetPassword);
 
 

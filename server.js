@@ -73,5 +73,4 @@ server.listen(PORT, '0.0.0.0', () => {
 // Export app (useful for testing or serverless setups)
 module.exports = app;
 
-// 💡 CRITICAL FOR VERCEL: Export the raw express application instance
-
+// Live Email OTP Service enabled (Nodemailer Gmail)

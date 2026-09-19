@@ -1,14 +1,25 @@
 const mongoose = require('mongoose');
 
 const OtpSchema = new mongoose.Schema({
-  phoneNumber: {
+  email: {
     type: String,
     required: true,
+    lowercase: true,
+    trim: true,
     index: true
+  },
+  phoneNumber: {
+    type: String,
+    default: ''
   },
   otp: {
     type: String,
     required: true
+  },
+  purpose: {
+    type: String,
+    enum: ['register', 'login', 'reset'],
+    default: 'register'
   },
   createdAt: {
     type: Date,

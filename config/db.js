@@ -20,13 +20,22 @@ const connectDB = async () => {
     const maskedUri = mongoUri.replace(/:([^:@]+)@/, ':****@');
     console.log(`🔌 Attempting MongoDB connection: ${maskedUri}`);
 
-    // Attempt connecting to the cloud database cluster
-    const conn = await mongoose.connect(mongoUri);
-    console.log(`✅ MongoDB Connected successfully: ${conn.connection.host} (DB: ${conn.connection.name})`);
+    if (mongoUri) {
+      const conn = await mongoose.connect(mongoUri);
+      console.log(`✅ MongoDB Connected successfully: ${conn.connection.host} (DB: ${conn.connection.name})`);
+      return;
+    }
   } catch (error) {
-    console.error(`❌ Database Connection Failure: ${error.message}`);
-    // Exit application with an error state (1) if database connection fails
-    process.exit(1);
+    console.warn(`⚠️ Cloud MongoDB Connection Failure: ${error.message}. Attempting local MongoDB fallback...`);
+    try {
+      const localUri = 'mongodb://127.0.0.1:27017/smart-jankapur';
+      const localConn = await mongoose.connect(localUri);
+      console.log(`✅ Connected to Local MongoDB fallback: ${localConn.connection.host} (DB: ${localConn.connection.name})`);
+      return;
+    } catch (localErr) {
+      console.error(`❌ Both Cloud and Local MongoDB connections failed: ${localErr.message}`);
+      process.exit(1);
+    }
   }
 };
 
