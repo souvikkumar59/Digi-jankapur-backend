@@ -58,12 +58,15 @@ app.get('/', (req, res) => {
 
 // 💡 4. VERCEL SERVERLESS COMPATIBILITY
 // Run standard server initialization ONLY when testing locally, not on Vercel production.
-if (process.env.NODE_ENV !== 'production') {
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    console.log(`Server executing smoothly on port ${PORT}`);
-  });
-}
+// 💡 Setup port and start HTTP / Socket.io server
+const PORT = process.env.PORT || 5000;
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`📡 Server & Socket.io executing smoothly on port ${PORT}`);
+});
+
+// Export app (useful for testing or serverless setups)
+module.exports = app;
 
 // 💡 CRITICAL FOR VERCEL: Export the raw express application instance
 module.exports = app;
